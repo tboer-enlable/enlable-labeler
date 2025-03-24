@@ -18,15 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Euro, User, CreditCard, Clock, BarChart, History } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
-// Mock payment processing function
-const mockProcessPayment = async (amount: number): Promise<boolean> => {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  // Simulate success (in a real app, you'd integrate with Stripe or another payment processor)
-  return true;
-};
+import { supabase } from '@/integrations/supabase/client';
 
 const Profile = () => {
   const { user, updateBalance } = useAuth();
@@ -60,18 +52,36 @@ const Profile = () => {
     setIsProcessing(true);
     
     try {
-      // In a real app, this would call your payment processing API
-      const success = await mockProcessPayment(amountNumber);
+      // Record transaction in Supabase
+      const { error: transactionError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          amount_eur: amountNumber,
+          description: 'Account top-up'
+        });
       
-      if (success) {
-        // Update user balance
-        updateBalance(user.balance + amountNumber);
-        
-        toast.success(`Successfully added €${amountNumber.toFixed(2)} to your account`);
-        setAmount('');
-      } else {
-        toast.error('Payment failed. Please try again.');
+      if (transactionError) {
+        throw transactionError;
       }
+      
+      // Update user balance
+      const newBalance = user.balance + amountNumber;
+      
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ balance_eur: newBalance })
+        .eq('id', user.id);
+      
+      if (updateError) {
+        throw updateError;
+      }
+      
+      // Update user balance in context
+      updateBalance(newBalance);
+      
+      toast.success(`Successfully added €${amountNumber.toFixed(2)} to your account`);
+      setAmount('');
     } catch (error) {
       console.error('Error processing payment:', error);
       toast.error('Error processing payment. Please try again.');

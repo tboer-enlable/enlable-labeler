@@ -1,6 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { User, Session } from '@supabase/supabase-js';
 
 // Define user type
 interface User {
@@ -40,72 +42,79 @@ const AuthContext = createContext<AuthContextType>({
 // Create a hook to use the auth context
 export const useAuth = () => useContext(AuthContext);
 
-// Mock API functions (replace with real implementation)
-const mockLogin = async (email: string, password: string): Promise<User> => {
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // Mock verification check
-  if (email === 'unverified@example.com') {
-    throw new Error('Please verify your email before logging in.');
-  }
-  
-  // Return mock user data
-  return {
-    id: '1',
-    email,
-    name: 'John Doe',
-    balance: 50.0,
-    emailVerified: true
-  };
-};
-
-const mockSignup = async (email: string, name: string, password: string): Promise<void> => {
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // Success
-  return;
-};
-
-const mockVerifyEmail = async (token: string): Promise<void> => {
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // Success
-  return;
-};
-
-const mockResetPassword = async (email: string): Promise<void> => {
-  // Simulate API call
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // Success
-  return;
-};
-
 // Provider component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
 
-  // Check if user is already logged in
+  // Check for session changes
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const storedUser = localStorage.getItem('enlable_user');
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session);
+        if (session) {
+          // Fetch user profile data from the profiles table
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (error) {
+            console.error('Error fetching user profile:', error);
+            setUser(null);
+          } else {
+            setUser({
+              id: session.user.id,
+              email: session.user.email || '',
+              name: data.full_name || '',
+              balance: data.balance_eur || 0,
+              emailVerified: session.user.email_confirmed_at ? true : false,
+            });
+          }
+        } else {
+          setUser(null);
         }
-      } catch (err) {
-        console.error('Authentication error:', err);
-      } finally {
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) {
+        // Fetch user profile data
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data, error }) => {
+            if (error) {
+              console.error('Error fetching user profile:', error);
+              setUser(null);
+            } else {
+              setUser({
+                id: session.user.id,
+                email: session.user.email || '',
+                name: data.full_name || '',
+                balance: data.balance_eur || 0,
+                emailVerified: session.user.email_confirmed_at ? true : false,
+              });
+            }
+            setLoading(false);
+          });
+      } else {
+        setUser(null);
         setLoading(false);
       }
-    };
+    });
 
-    checkAuth();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Login function
@@ -113,15 +122,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setError(null);
     try {
-      const user = await mockLogin(email, password);
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       
-      // Save user to localStorage
-      localStorage.setItem('enlable_user', JSON.stringify(user));
-      setUser(user);
+      if (error) {
+        throw error;
+      }
+      
       toast.success('Logged in successfully');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to login');
-      toast.error(err instanceof Error ? err.message : 'Failed to login');
+    } catch (err: any) {
+      setError(err.message);
+      toast.error(err.message);
       throw err;
     } finally {
       setLoading(false);
@@ -133,11 +146,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setError(null);
     try {
-      await mockSignup(email, name, password);
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+          },
+        },
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
       toast.success('Account created! Please verify your email to continue.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sign up');
-      toast.error(err instanceof Error ? err.message : 'Failed to sign up');
+    } catch (err: any) {
+      setError(err.message);
+      toast.error(err.message);
       throw err;
     } finally {
       setLoading(false);
@@ -145,10 +171,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Logout function
-  const logout = () => {
-    localStorage.removeItem('enlable_user');
-    setUser(null);
-    toast.success('Logged out successfully');
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast.success('Logged out successfully');
+    } catch (err: any) {
+      console.error('Logout error:', err);
+      toast.error('Failed to log out');
+    }
   };
 
   // Verify email function
@@ -156,11 +186,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setError(null);
     try {
-      await mockVerifyEmail(token);
+      // Note: In Supabase, email verification is handled automatically
+      // This function is kept for API consistency
       toast.success('Email verified successfully. Please log in.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to verify email');
-      toast.error(err instanceof Error ? err.message : 'Failed to verify email');
+    } catch (err: any) {
+      setError(err.message);
+      toast.error(err.message);
       throw err;
     } finally {
       setLoading(false);
@@ -172,11 +203,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     setError(null);
     try {
-      await mockResetPassword(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
       toast.success('Password reset email sent. Please check your inbox.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reset password');
-      toast.error(err instanceof Error ? err.message : 'Failed to reset password');
+    } catch (err: any) {
+      setError(err.message);
+      toast.error(err.message);
       throw err;
     } finally {
       setLoading(false);
@@ -184,11 +222,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Update balance function
-  const updateBalance = (newBalance: number) => {
+  const updateBalance = async (newBalance: number) => {
     if (user) {
-      const updatedUser = { ...user, balance: newBalance };
-      localStorage.setItem('enlable_user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ balance_eur: newBalance })
+          .eq('id', user.id);
+        
+        if (error) {
+          throw error;
+        }
+        
+        setUser({
+          ...user,
+          balance: newBalance
+        });
+      } catch (err: any) {
+        console.error('Error updating balance:', err);
+        toast.error('Failed to update balance');
+      }
     }
   };
 

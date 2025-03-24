@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 // Usage data types
 export interface UsageData {
@@ -29,7 +30,7 @@ interface UsageContextType {
     outputCost: number; 
     totalCost: number 
   };
-  addUsage: (inputTokens: number, outputTokens: number) => void;
+  addUsage: (inputTokens: number, outputTokens: number, classificationId?: string) => Promise<void>;
   estimateTokenCount: (text: string) => number;
 }
 
@@ -37,7 +38,7 @@ interface UsageContextType {
 const UsageContext = createContext<UsageContextType>({
   usageSummary: { totalInputTokens: 0, totalOutputTokens: 0, totalCost: 0, history: [] },
   calculateTokenCost: () => ({ inputCost: 0, outputCost: 0, totalCost: 0 }),
-  addUsage: () => {},
+  addUsage: async () => {},
   estimateTokenCount: () => 0,
 });
 
@@ -54,17 +55,10 @@ export const UsageProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     history: [],
   });
 
-  // Load usage data from local storage when user changes
+  // Load usage data from Supabase when user changes
   useEffect(() => {
     if (user) {
-      try {
-        const storedUsage = localStorage.getItem(`enlable_usage_${user.id}`);
-        if (storedUsage) {
-          setUsageSummary(JSON.parse(storedUsage));
-        }
-      } catch (error) {
-        console.error('Error loading usage data from local storage:', error);
-      }
+      fetchUsageData();
     } else {
       // Reset when user logs out
       setUsageSummary({
@@ -76,12 +70,57 @@ export const UsageProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [user]);
 
-  // Save usage data to local storage when it changes
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem(`enlable_usage_${user.id}`, JSON.stringify(usageSummary));
+  // Fetch usage data from Supabase
+  const fetchUsageData = async () => {
+    if (!user) return;
+    
+    try {
+      // Get total input tokens
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('input_tokens_used, output_tokens_used')
+        .eq('id', user.id)
+        .single();
+      
+      if (profileError) {
+        throw profileError;
+      }
+      
+      // Get usage history
+      const { data: usageData, error: usageError } = await supabase
+        .from('usage_logs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (usageError) {
+        throw usageError;
+      }
+      
+      // Calculate total cost
+      const totalCost = calculateTotalCostFromUsageLogs(usageData || []);
+      
+      // Update usage summary
+      setUsageSummary({
+        totalInputTokens: profileData?.input_tokens_used || 0,
+        totalOutputTokens: profileData?.output_tokens_used || 0,
+        totalCost,
+        history: (usageData || []).map(log => ({
+          date: log.created_at,
+          inputTokens: log.input_tokens,
+          outputTokens: log.output_tokens,
+          cost: log.cost_eur
+        }))
+      });
+    } catch (error) {
+      console.error('Error loading usage data from Supabase:', error);
     }
-  }, [usageSummary, user]);
+  };
+
+  // Calculate total cost from usage logs
+  const calculateTotalCostFromUsageLogs = (logs: any[]) => {
+    return logs.reduce((sum, log) => sum + (log.cost_eur || 0), 0);
+  };
 
   // Calculate cost for tokens
   const calculateTokenCost = (inputTokens: number, outputTokens: number) => {
@@ -97,37 +136,70 @@ export const UsageProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Add usage data
-  const addUsage = (inputTokens: number, outputTokens: number) => {
+  const addUsage = async (inputTokens: number, outputTokens: number, classificationId?: string) => {
     if (!user) return;
     
     const { inputCost, outputCost, totalCost } = calculateTokenCost(inputTokens, outputTokens);
     
-    const newUsageData: UsageData = {
-      date: new Date().toISOString(),
-      inputTokens,
-      outputTokens,
-      cost: totalCost
-    };
-    
-    setUsageSummary(prev => {
-      const newSummary = {
-        totalInputTokens: prev.totalInputTokens + inputTokens,
-        totalOutputTokens: prev.totalOutputTokens + outputTokens,
-        totalCost: parseFloat((prev.totalCost + totalCost).toFixed(4)),
-        history: [...prev.history, newUsageData],
-      };
+    try {
+      // Add usage log
+      const { error: logError } = await supabase
+        .from('usage_logs')
+        .insert({
+          user_id: user.id,
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+          cost_eur: totalCost,
+          classification_id: classificationId
+        });
       
-      return newSummary;
-    });
-    
-    // Deduct cost from user balance
-    if (user.balance) {
-      updateBalance(user.balance - totalCost);
+      if (logError) {
+        throw logError;
+      }
+      
+      // Update user profile tokens
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('input_tokens_used, output_tokens_used, balance_eur')
+        .eq('id', user.id)
+        .single();
+      
+      if (profileError) {
+        throw profileError;
+      }
+      
+      const newInputTotal = (profileData?.input_tokens_used || 0) + inputTokens;
+      const newOutputTotal = (profileData?.output_tokens_used || 0) + outputTokens;
+      const newBalance = (profileData?.balance_eur || 0) - totalCost;
+      
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          input_tokens_used: newInputTotal,
+          output_tokens_used: newOutputTotal,
+          balance_eur: newBalance
+        })
+        .eq('id', user.id);
+      
+      if (updateError) {
+        throw updateError;
+      }
+      
+      // Refresh usage data
+      await fetchUsageData();
+      
+      // Update user balance in auth context
+      if (updateBalance) {
+        updateBalance(newBalance);
+      }
+    } catch (error) {
+      console.error('Error recording usage:', error);
+      throw error;
     }
   };
 
   // Estimate token count for a given text
-  // This is a very simplistic estimation - in production use a proper tokenizer
+  // This is a simplistic estimation - in production use a proper tokenizer
   const estimateTokenCount = (text: string) => {
     // Rough estimate: 1 token ≈ 4 characters in English
     return Math.ceil(text.length / 4);

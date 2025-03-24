@@ -11,31 +11,7 @@ import { Upload, Tag, Download, AlertTriangle, FileText, Info, CheckCircle } fro
 import * as XLSX from 'xlsx';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-
-// Mock API function to simulate labeling with GPT-4o
-const mockLabelWithGPT4o = async (
-  inputTextData: InputTextData,
-  categoryData: CategoryData,
-  exampleData: ExampleData
-): Promise<{ labeledData: LabeledData, outputTokenCount: number }> => {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 3000));
-  
-  // Mock labeled data - in a real app, this would be the result from OpenAI API
-  const labeledData: LabeledData = {
-    inputText: inputTextData.inputText,
-    category: inputTextData.inputText.map((_, index) => {
-      // Just randomly assign categories for the mock
-      const randomCategoryIndex = Math.floor(Math.random() * categoryData.category.length);
-      return categoryData.category[randomCategoryIndex];
-    })
-  };
-  
-  // Mock output token count - in a real app, this would come from the OpenAI API response
-  const outputTokenCount = 150 * inputTextData.inputText.length;
-  
-  return { labeledData, outputTokenCount };
-};
+import { supabase } from '@/integrations/supabase/client';
 
 const Labeler = () => {
   const { user } = useAuth();
@@ -186,27 +162,55 @@ const Labeler = () => {
       setIsProcessing(true);
       setProcessingComplete(false);
       
-      // In a real app, this would call your backend API which then calls OpenAI
-      const { labeledData, outputTokenCount: actualOutputTokenCount } = await mockLabelWithGPT4o(
-        inputTextData,
-        categoryData,
-        exampleData
-      );
+      // Prepare data for the edge function
+      const data = {
+        inputTexts: inputTextData.inputText,
+        categories: categoryData.category.map((cat, index) => ({
+          category: cat,
+          categoryDescription: categoryData.categoryDescription[index]
+        })),
+        examples: exampleData.exampleInputText.map((text, index) => ({
+          exampleInputText: text,
+          desiredCategory: exampleData.desiredCategory[index]
+        }))
+      };
+      
+      // Call the Supabase edge function
+      const { data: responseData, error } = await supabase.functions.invoke('classify-text', {
+        body: data
+      });
+      
+      if (error) {
+        throw new Error(`Error calling classify-text function: ${error.message}`);
+      }
+      
+      const { results, usage } = responseData;
+      
+      if (!results || !Array.isArray(results)) {
+        throw new Error('Invalid response from classification function');
+      }
+      
+      // Extract the labeled data
+      const labeledData: LabeledData = {
+        inputText: results.map(item => item.text),
+        category: results.map(item => item.category)
+      };
       
       // Store the labeled data
-      storeLabeledData(labeledData);
+      const classificationId = await storeLabeledData(labeledData);
       
       // Set output token count from API response
+      const actualOutputTokenCount = usage?.outputTokens || 0;
       setOutputTokenCount(actualOutputTokenCount);
       
       // Record usage
-      addUsage(inputTokenCount, actualOutputTokenCount);
+      await addUsage(inputTokenCount, actualOutputTokenCount, classificationId);
       
       setProcessingComplete(true);
       toast.success('Labeling complete');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error labeling data:', error);
-      toast.error('Error labeling data. Please try again.');
+      toast.error(error.message || 'Error labeling data. Please try again.');
     } finally {
       setIsProcessing(false);
     }
