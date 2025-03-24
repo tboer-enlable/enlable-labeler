@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import Layout from '@/components/layout/Layout';
 import { ArrowRight, Tag, Upload, Download, Zap } from 'lucide-react';
@@ -43,6 +43,7 @@ const Index = () => {
               <Button
                 className="bg-enlable-500 hover:bg-enlable-600 text-white px-8 py-6 text-lg rounded-full hover:shadow-lg transition-all"
                 onClick={handleGetStarted}
+                type="button"
               >
                 {user ? "Go to Labeler" : "Get Started"} 
                 <ArrowRight className="ml-2 h-5 w-5" />
@@ -52,6 +53,7 @@ const Index = () => {
                   variant="outline"
                   className="border-enlable-200 hover:border-enlable-300 text-enlable-600 px-8 py-6 text-lg rounded-full hover:bg-enlable-50"
                   onClick={handleSignIn}
+                  type="button"
                 >
                   Sign In
                 </Button>
@@ -215,6 +217,7 @@ const Index = () => {
             <Button
               className="bg-white text-enlable-600 hover:bg-gray-100 px-8 py-6 text-lg rounded-full hover:shadow-lg transition-all"
               onClick={handleGetStarted}
+              type="button"
             >
               {user ? "Go to Labeler" : "Get Started for Free"} 
               <ArrowRight className="ml-2 h-5 w-5" />
