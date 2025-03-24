@@ -4,6 +4,7 @@ import { useAuth } from './AuthContext';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
+import { Json } from '@/integrations/supabase/types';
 
 // Types for our file data
 export interface InputTextData {
@@ -487,20 +488,21 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (data) {
         setCurrentClassificationId(data.id);
         
-        // Process input texts
-        if (data.input_texts) {
-          const inputTexts = data.input_texts.data || [];
-          if (inputTexts.length > 0) {
+        // Process input texts - with proper type checking
+        if (data.input_texts && typeof data.input_texts === 'object' && data.input_texts !== null) {
+          const inputTexts = (data.input_texts as any).data || [];
+          if (Array.isArray(inputTexts) && inputTexts.length > 0) {
             setInputTextData({ inputText: inputTexts });
           }
         }
         
-        // Process categories
-        if (data.categories) {
-          const categories = data.categories.categories || [];
-          const descriptions = data.categories.descriptions || [];
+        // Process categories - with proper type checking
+        if (data.categories && typeof data.categories === 'object' && data.categories !== null) {
+          const categories = (data.categories as any).categories || [];
+          const descriptions = (data.categories as any).descriptions || [];
           
-          if (categories.length > 0 && descriptions.length > 0) {
+          if (Array.isArray(categories) && Array.isArray(descriptions) && 
+              categories.length > 0 && descriptions.length > 0) {
             setCategoryData({ 
               category: categories, 
               categoryDescription: descriptions 
@@ -508,12 +510,13 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           }
         }
         
-        // Process examples
-        if (data.examples) {
-          const texts = data.examples.texts || [];
-          const categories = data.examples.categories || [];
+        // Process examples - with proper type checking
+        if (data.examples && typeof data.examples === 'object' && data.examples !== null) {
+          const texts = (data.examples as any).texts || [];
+          const categories = (data.examples as any).categories || [];
           
-          if (texts.length > 0 && categories.length > 0) {
+          if (Array.isArray(texts) && Array.isArray(categories) && 
+              texts.length > 0 && categories.length > 0) {
             setExampleData({ 
               exampleInputText: texts, 
               desiredCategory: categories 
@@ -521,12 +524,13 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           }
         }
         
-        // Process results
-        if (data.results) {
-          const texts = data.results.texts || [];
-          const categories = data.results.categories || [];
+        // Process results - with proper type checking
+        if (data.results && typeof data.results === 'object' && data.results !== null) {
+          const texts = (data.results as any).texts || [];
+          const categories = (data.results as any).categories || [];
           
-          if (texts.length > 0 && categories.length > 0) {
+          if (Array.isArray(texts) && Array.isArray(categories) && 
+              texts.length > 0 && categories.length > 0) {
             setLabeledData({ 
               inputText: texts, 
               category: categories 
