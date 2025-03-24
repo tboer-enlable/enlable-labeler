@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import Layout from '@/components/layout/Layout';
 import { ArrowRight, Tag, Upload, Download, Zap } from 'lucide-react';
@@ -8,6 +8,19 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleGetStarted = () => {
+    if (user) {
+      navigate('/labeler');
+    } else {
+      navigate('/signup');
+    }
+  };
+
+  const handleSignIn = () => {
+    navigate('/login');
+  };
 
   return (
     <Layout>
@@ -28,23 +41,19 @@ const Index = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-up" style={{ animationDelay: "0.2s" }}>
               <Button
-                asChild
                 className="bg-enlable-500 hover:bg-enlable-600 text-white px-8 py-6 text-lg rounded-full hover:shadow-lg transition-all"
+                onClick={handleGetStarted}
               >
-                <Link to={user ? "/labeler" : "/signup"}>
-                  {user ? "Go to Labeler" : "Get Started"} 
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
+                {user ? "Go to Labeler" : "Get Started"} 
+                <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
               {!user && (
                 <Button
-                  asChild
                   variant="outline"
                   className="border-enlable-200 hover:border-enlable-300 text-enlable-600 px-8 py-6 text-lg rounded-full hover:bg-enlable-50"
+                  onClick={handleSignIn}
                 >
-                  <Link to="/login">
-                    Sign In
-                  </Link>
+                  Sign In
                 </Button>
               )}
             </div>
@@ -204,13 +213,11 @@ const Index = () => {
               Join thousands of users who are streamlining their text classification workflow with Enlable.
             </p>
             <Button
-              asChild
               className="bg-white text-enlable-600 hover:bg-gray-100 px-8 py-6 text-lg rounded-full hover:shadow-lg transition-all"
+              onClick={handleGetStarted}
             >
-              <Link to={user ? "/labeler" : "/signup"}>
-                {user ? "Go to Labeler" : "Get Started for Free"} 
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
+              {user ? "Go to Labeler" : "Get Started for Free"} 
+              <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </div>
         </div>
