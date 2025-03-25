@@ -1,21 +1,15 @@
 
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const CTASection = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
-
-  const handleGetStarted = () => {
-    if (user) {
-      navigate('/labeler');
-    } else {
-      navigate('/signup');
-    }
-  };
+  
+  // Determine target route
+  const targetPath = user ? '/labeler' : '/signup';
+  const buttonText = user ? "Go to Labeler" : "Get Started for Free";
 
   return (
     <section className="bg-enlable-500 py-16">
@@ -27,15 +21,16 @@ const CTASection = () => {
           <p className="text-xl text-enlable-50 mb-8 max-w-2xl mx-auto">
             Join thousands of users who are streamlining their text classification workflow with Enlable.
           </p>
-          <Button
-            className="bg-white text-enlable-600 hover:bg-gray-100 px-8 py-6 text-lg rounded-full hover:shadow-lg transition-all"
-            onClick={handleGetStarted}
-            type="button"
-            aria-label={user ? "Go to Labeler" : "Get Started for Free"}
-          >
-            {user ? "Go to Labeler" : "Get Started for Free"} 
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
+          <Link to={targetPath} className="inline-block">
+            <button
+              className="bg-white text-enlable-600 hover:bg-gray-100 px-8 py-6 text-lg rounded-full hover:shadow-lg transition-all flex items-center justify-center"
+              type="button"
+              aria-label={buttonText}
+            >
+              {buttonText} 
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </button>
+          </Link>
         </div>
       </div>
     </section>
