@@ -21,4 +21,15 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Add build options to improve caching behavior
+  build: {
+    rollupOptions: {
+      output: {
+        // Use content hashing for proper cache invalidation
+        entryFileNames: 'assets/[name].[hash].js',
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[hash].[ext]',
+      }
+    },
+  }
 }));
