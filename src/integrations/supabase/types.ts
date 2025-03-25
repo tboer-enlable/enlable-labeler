@@ -9,7 +9,117 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          balance_eur: number | null
+          full_name: string | null
+          id: string
+          input_tokens_used: number | null
+          output_tokens_used: number | null
+        }
+        Insert: {
+          balance_eur?: number | null
+          full_name?: string | null
+          id: string
+          input_tokens_used?: number | null
+          output_tokens_used?: number | null
+        }
+        Update: {
+          balance_eur?: number | null
+          full_name?: string | null
+          id?: string
+          input_tokens_used?: number | null
+          output_tokens_used?: number | null
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount_eur: number
+          created_at: string | null
+          description: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          amount_eur: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          amount_eur?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      usage_logs: {
+        Row: {
+          classification_id: string | null
+          cost_eur: number
+          created_at: string | null
+          id: string
+          input_tokens: number
+          output_tokens: number
+          user_id: string
+        }
+        Insert: {
+          classification_id?: string | null
+          cost_eur?: number
+          created_at?: string | null
+          id?: string
+          input_tokens?: number
+          output_tokens?: number
+          user_id: string
+        }
+        Update: {
+          classification_id?: string | null
+          cost_eur?: number
+          created_at?: string | null
+          id?: string
+          input_tokens?: number
+          output_tokens?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_classifications: {
+        Row: {
+          categories: Json | null
+          created_at: string | null
+          examples: Json | null
+          id: string
+          input_texts: Json | null
+          results: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          categories?: Json | null
+          created_at?: string | null
+          examples?: Json | null
+          id?: string
+          input_texts?: Json | null
+          results?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          categories?: Json | null
+          created_at?: string | null
+          examples?: Json | null
+          id?: string
+          input_texts?: Json | null
+          results?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
