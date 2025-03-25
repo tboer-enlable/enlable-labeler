@@ -41,6 +41,7 @@ const HeroSection = () => {
               className="bg-enlable-500 hover:bg-enlable-600 text-white px-8 py-6 text-lg rounded-full hover:shadow-lg transition-all"
               onClick={handleGetStarted}
               type="button"
+              aria-label={user ? "Go to Labeler" : "Get Started"}
             >
               {user ? "Go to Labeler" : "Get Started"} 
               <ArrowRight className="ml-2 h-5 w-5" />
@@ -51,6 +52,7 @@ const HeroSection = () => {
                 className="border-enlable-200 hover:border-enlable-300 text-enlable-600 px-8 py-6 text-lg rounded-full hover:bg-enlable-50"
                 onClick={handleSignIn}
                 type="button"
+                aria-label="Sign In"
               >
                 Sign In
               </Button>

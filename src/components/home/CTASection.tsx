@@ -31,6 +31,7 @@ const CTASection = () => {
             className="bg-white text-enlable-600 hover:bg-gray-100 px-8 py-6 text-lg rounded-full hover:shadow-lg transition-all"
             onClick={handleGetStarted}
             type="button"
+            aria-label={user ? "Go to Labeler" : "Get Started for Free"}
           >
             {user ? "Go to Labeler" : "Get Started for Free"} 
             <ArrowRight className="ml-2 h-5 w-5" />
